@@ -59,7 +59,6 @@ export async function routes(app: FastifyInstance) {
 
     const day = await prisma.day.findFirst({
       where: {
-        // date: parsedDate.toDate()
         date: parsedDate.toDate()
       },
       include: {
@@ -68,7 +67,7 @@ export async function routes(app: FastifyInstance) {
     })
 
 
-    const completedHabits  = day?.dayHabits.map(dayHabit => {
+    const completedHabits = day?.dayHabits.map(dayHabit => {
       return dayHabit.habit_id
     })
 
@@ -78,4 +77,87 @@ export async function routes(app: FastifyInstance) {
     }
   })
 
+  app.patch('/habits/:id/toggle', async (request) => {
+
+    const toggleHabitParams = z.object({
+      id: z.string().uuid()
+    })
+
+    const { id } = toggleHabitParams.parse(request.params)
+
+    const today = dayjs().startOf('day').toDate()
+
+    let day = await prisma.day.findFirst({
+      where: {
+        date: today
+      }
+    })
+
+    if (!day) {
+      day = await prisma.day.create({
+        data: {
+          date: today
+        }
+      })
+    }
+
+    const dayHabit = await prisma.dayHabit.findUnique({
+      where: {
+        day_id_habit_id: {
+          day_id: day.id,
+          habit_id: id
+        }
+      }
+    })
+
+    if (dayHabit) {
+      await prisma.dayHabit.delete({
+        where: {
+          id: dayHabit.id
+        }
+      })
+
+    } else {
+      //Completar o hábito 
+      await prisma.dayHabit.create({
+        data: {
+          day_id: day.id,
+          habit_id: id
+        }
+      })
+    }
+
+
+
+  })
+
+  app.get('/summary', async () => {
+
+    const summary = await prisma.$queryRaw`
+      SELECT 
+        D.id, 
+        D.date,
+        (
+          SELECT
+            cast(count(*) as float)
+            FROM DayHabit DH
+            WHERE DH.day_id = D.id
+        ) as completed,
+        (
+          SELECT 
+            cast(count(*) as float)
+          FROM HabitWeekDays HWD 
+          JOIN Habit H 
+            ON H.id = HWD.habit_id
+          WHERE 
+            HWD.week_day = str_to_date(D.date, '%w')
+            AND H.created_at <= D.date
+            -- HWD.week_day = cast(str_to_date(D.date, '%w') as int)
+        ) as amount
+        FROM Day D
+    `
+
+    return summary
+
+  })
 }
