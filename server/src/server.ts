@@ -10,7 +10,8 @@ app.register(cors)
 app.register(routes) 
 
 app.listen({
-  port:Number(process.env.PORT) 
+  port:Number(process.env.PORT) ,
+  host: '0.0.0.0'
 }).then(() => {
   console.log(`HTTP Server running ${process.env.PORT}! `)
 })
