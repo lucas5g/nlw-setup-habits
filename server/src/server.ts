@@ -1,4 +1,5 @@
 import fastify from "fastify";
+import 'dotenv/config'
 
 import cors from '@fastify/cors'
 import { routes } from "./routes";
